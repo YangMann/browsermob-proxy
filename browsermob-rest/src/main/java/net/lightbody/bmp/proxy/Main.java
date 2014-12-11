@@ -102,10 +102,7 @@ public class Main {
 			
 	    	try {
 				LogManager.getLogManager().readConfiguration(logFile);
-			} catch (SecurityException e) {
-				System.out.println("Unable to read " + LOGGING_PROPERTIES_FILENAME + ". Using default logging configuration.");
-				useDefaultLogging = true;
-			} catch (IOException e) {
+			} catch (SecurityException | IOException e) {
 				System.out.println("Unable to read " + LOGGING_PROPERTIES_FILENAME + ". Using default logging configuration.");
 				useDefaultLogging = true;
 			} finally {
