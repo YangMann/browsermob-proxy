@@ -1,0 +1,37 @@
+Manifest-Version: 1.0
+Class-Path: wagon-http-lightweight-2.4.jar jetty-server-7.3.0.v2011020
+ 3.jar shrinkwrap-impl-base-1.1.2.jar httpcore-4.3.2.jar jetty-util-7.
+ 3.0.v20110203.jar javax.inject-1.jar uadetector-resources-2014.10.jar
+  aether-impl-1.13.1.jar plexus-classworlds-1.2-alpha-10.jar maven-aet
+ her-provider-3.0.5.jar xmlParserAPIs-2.6.2.jar maven-settings-3.0.5.j
+ ar shrinkwrap-resolver-api-maven-archive-2.0.0.jar commons-httpclient
+ -3.1.jar commons-logging-1.1.3.jar mvel2-2.0.18.jar shrinkwrap-resolv
+ er-impl-maven-2.0.0.jar aether-connector-wagon-1.13.1.jar httpclient-
+ 4.3.4.jar jopt-simple-3.2.jar uadetector-core-0.9.22.jar xom-1.0.jar 
+ xalan-2.6.0.jar jetty-security-7.3.0.v20110203.jar slf4j-jdk14-1.7.7.
+ jar jetty-http-7.3.0.v20110203.jar commons-lang-2.5.jar plexus-utils-
+ 2.0.6.jar slf4j-api-1.7.7.jar guice-multibindings-3.0.jar bcprov-jdk1
+ 5on-1.47.jar shrinkwrap-resolver-spi-2.0.0.jar guava-15.0.jar xml-api
+ s-1.4.01.jar jcip-annotations-1.0.jar shrinkwrap-resolver-impl-maven-
+ archive-2.0.0.jar saxpath-1.0-FCS.jar httpmime-4.3.4.jar jdom-1.0.jar
+  aopalliance-1.0.jar aether-util-1.13.1.jar wagon-file-2.4.jar shrink
+ wrap-api-1.1.2.jar quality-check-1.3.jar jsr305-2.0.3.jar commons-io-
+ 1.4.jar ant-1.8.2.jar maven-settings-builder-3.0.5.jar jetty-continua
+ tion-7.3.0.v20110203.jar plexus-compiler-api-2.1.jar aether-spi-1.13.
+ 1.jar shrinkwrap-resolver-spi-maven-archive-2.0.0.jar jackson-mapper-
+ asl-1.7.1.jar jetty-io-7.3.0.v20110203.jar shrinkwrap-resolver-api-ma
+ ven-2.0.0.jar jsr250-api-1.0.jar plexus-compiler-javac-2.1.jar dom4j-
+ 1.6.1.jar xstream-1.3.1.jar servlet-api-2.5.jar plexus-sec-dispatcher
+ -1.4.jar selenium-api-2.43.0.jar icu4j-2.6.1.jar jaxen-1.1.1.jar mave
+ n-repository-metadata-3.0.5.jar jetty-servlet-7.3.0.v20110203.jar ant
+ -launcher-1.8.2.jar sitebricks-0.8.3.jar wagon-provider-api-2.4.jar m
+ aven-model-builder-3.0.5.jar shrinkwrap-resolver-api-2.0.0.jar maven-
+ model-3.0.5.jar guice-servlet-3.0.jar freemarker-2.3.10.jar shrinkwra
+ p-resolver-spi-maven-2.0.0.jar jackson-core-asl-1.7.1.jar plexus-ciph
+ er-1.4.jar shrinkwrap-spi-1.1.2.jar aether-api-1.13.1.jar json-200807
+ 01.jar annotations-7.0.3.jar plexus-interpolation-1.14.jar wagon-http
+ -shared4-2.4.jar commons-codec-1.6.jar plexus-component-api-1.0-alpha
+ -33.jar jsoup-1.4.1.jar arquillian-phantom-driver-1.1.1.Final.jar xpp
+ 3_min-1.1.4c.jar guice-3.0.jar
+Main-Class: 
+
