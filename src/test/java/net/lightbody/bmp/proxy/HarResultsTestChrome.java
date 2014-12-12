@@ -6,6 +6,7 @@ import net.lightbody.bmp.core.har.HarLog;
 import net.lightbody.bmp.core.har.HarNameVersion;
 import org.apache.http.client.methods.HttpGet;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.openqa.selenium.Proxy;
 import org.openqa.selenium.WebDriver;
@@ -56,6 +57,7 @@ public class HarResultsTestChrome extends DummyServerTest {
     }
 
     @Test
+    @Ignore
     public void testHarContainsUserAgent() {
         ProxyServer server = new ProxyServer(0);
         server.start();

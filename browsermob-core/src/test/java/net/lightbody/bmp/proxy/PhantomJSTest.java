@@ -4,10 +4,7 @@ import net.lightbody.bmp.core.har.Har;
 import net.lightbody.bmp.core.har.HarEntry;
 import org.hamcrest.CoreMatchers;
 import org.jboss.arquillian.phantom.resolver.ResolvingPhantomJSDriverService;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 import org.openqa.selenium.Proxy;
 import org.openqa.selenium.phantomjs.PhantomJSDriver;
 import org.openqa.selenium.phantomjs.PhantomJSDriverService;
@@ -45,6 +42,7 @@ public class PhantomJSTest {
     }
     
     @Test
+    @Ignore
     public void basicBasic() throws Exception {
         // get the selenium proxy object
         Proxy proxy = server.seleniumProxy();
@@ -80,6 +78,7 @@ public class PhantomJSTest {
     }
 
     @Test
+    @Ignore
     public void basicSsl() throws Exception {
         // get the selenium proxy object
         Proxy proxy = server.seleniumProxy();
