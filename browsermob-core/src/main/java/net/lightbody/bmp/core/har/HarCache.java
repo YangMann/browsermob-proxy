@@ -6,6 +6,16 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public class HarCache {
     private volatile HarCacheStatus beforeRequest;
     private volatile HarCacheStatus afterRequest;
+    private String comment = "";
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
+
 
     public HarCacheStatus getBeforeRequest() {
         return beforeRequest;
