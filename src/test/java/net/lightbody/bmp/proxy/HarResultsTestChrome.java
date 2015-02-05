@@ -14,9 +14,12 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.remote.CapabilityType;
 import org.openqa.selenium.remote.DesiredCapabilities;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 
 public class HarResultsTestChrome extends DummyServerTest {
+    @Ignore
     @Test
     public void testRequestAndResponseSizesAreSet() throws Exception {
 
@@ -87,6 +90,48 @@ public class HarResultsTestChrome extends DummyServerTest {
 
             Assert.assertEquals("Expected browser to be Chrome", "Chrome", harNameVersion.getName());
             Assert.assertNotNull("browser version is null", harNameVersion.getVersion());
+        } finally {
+            server.stop();
+            if (driver != null) {
+                driver.quit();
+            }
+        }
+    }
+
+    @Test
+    public void testHarSave() {
+        ProxyServer server = new ProxyServer(0);
+        server.start();
+
+        WebDriver driver = null;
+        File outFile;
+        try {
+            server.setCaptureHeaders(true);
+            server.setCaptureBinaryContent(true);
+            server.setCaptureContent(true);
+            server.newHar("testHarSave");
+            outFile = new File("test.json");
+
+            Proxy proxy1 = server.seleniumProxy();
+            DesiredCapabilities capabilities = new DesiredCapabilities();
+            capabilities.setCapability(CapabilityType.PROXY, proxy1);
+            System.setProperty("webdriver.chrome.driver", "D:/t-yaz/Source/Repos/Test/Experience/E2ETest/packages/" +
+                    "Selenium.WebDriver.ChromeDriver.2.10.0.0/content/chromedriver.exe");
+
+            driver = new ChromeDriver(capabilities);
+
+            driver.get("https://www.google.com");
+
+            Har har = server.getHar();
+            Assert.assertNotNull("Har is null", har);
+            HarLog log = har.getLog();
+            Assert.assertNotNull("Log is null", log);
+            HarNameVersion harNameVersion = log.getBrowser();
+            Assert.assertNotNull("HarNameVersion is null", harNameVersion);
+            har.writeTo(outFile);
+
+        } catch (IOException e) {
+            e.printStackTrace();
         } finally {
             server.stop();
             if (driver != null) {
