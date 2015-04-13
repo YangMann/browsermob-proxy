@@ -1,5 +1,6 @@
 package net.lightbody.bmp.proxy.test.util;
 
+import net.lightbody.bmp.proxy.LegacyProxyServer;
 import net.lightbody.bmp.proxy.ProxyServer;
 import net.lightbody.bmp.proxy.util.IOUtils;
 import org.apache.http.HttpHost;
@@ -34,7 +35,7 @@ public abstract class ProxyServerTest {
     /**
      * This test's proxy server, running on 127.0.0.1.
      */
-    protected ProxyServer proxy;
+    protected LegacyProxyServer proxy;
 
     /**
      * CloseableHttpClient that will connect through the local proxy running on 127.0.0.1.
@@ -60,7 +61,7 @@ public abstract class ProxyServerTest {
      * Hook to allow tests to initialize the proxy server with a custom configuration, but still leverage the rest of the
      * functionality in ProxyServerTest. The default implementation creates a new proxy server on port 0 (JVM-assigned port).
      */
-    protected ProxyServer createProxyServer() {
+    protected LegacyProxyServer createProxyServer() {
         return new ProxyServer(0);
     }
 
@@ -90,7 +91,7 @@ public abstract class ProxyServerTest {
         try {
             CloseableHttpResponse response = getResponseFromHost(url);
 
-            String body = IOUtils.readFully(response.getEntity().getContent());
+            String body = IOUtils.toStringAndClose(response.getEntity().getContent());
 
             response.close();
 
@@ -164,5 +165,14 @@ public abstract class ProxyServerTest {
         } catch (Exception e) {
             throw new RuntimeException("Unable to create new HTTP client", e);
         }
+    }
+
+    /**
+     * Checks if the test is running on a Windows OS.
+     *
+     * @return true if running on Windows, otherwise false
+     */
+    public static boolean isWindows() {
+        return System.getProperty("os.name").startsWith("Windows");
     }
 }

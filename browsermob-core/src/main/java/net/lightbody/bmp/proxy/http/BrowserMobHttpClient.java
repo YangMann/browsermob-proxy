@@ -1,43 +1,25 @@
 package net.lightbody.bmp.proxy.http;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.InflaterInputStream;
-import java.util.zip.Inflater;
-
-import net.lightbody.bmp.core.har.*;
+import com.google.common.collect.ImmutableMap;
+import net.lightbody.bmp.core.har.Har;
+import net.lightbody.bmp.core.har.HarCookie;
+import net.lightbody.bmp.core.har.HarEntry;
+import net.lightbody.bmp.core.har.HarNameValuePair;
+import net.lightbody.bmp.core.har.HarNameVersion;
+import net.lightbody.bmp.core.har.HarPostData;
+import net.lightbody.bmp.core.har.HarPostDataParam;
+import net.lightbody.bmp.core.har.HarRequest;
+import net.lightbody.bmp.core.har.HarResponse;
 import net.lightbody.bmp.proxy.BlacklistEntry;
+import net.lightbody.bmp.proxy.RewriteRule;
 import net.lightbody.bmp.proxy.Whitelist;
+import net.lightbody.bmp.proxy.jetty.util.MultiMap;
 import net.lightbody.bmp.proxy.jetty.util.UrlEncoded;
-import net.lightbody.bmp.proxy.util.*;
+import net.lightbody.bmp.proxy.util.BrowserMobProxyUtil;
+import net.lightbody.bmp.proxy.util.CappedByteArrayOutputStream;
+import net.lightbody.bmp.proxy.util.ClonedOutputStream;
+import net.lightbody.bmp.proxy.util.IOUtils;
 import net.sf.uadetector.ReadableUserAgent;
-import net.sf.uadetector.UserAgentStringParser;
-import net.sf.uadetector.service.UADetectorServiceFactory;
-
 import org.apache.http.Header;
 import org.apache.http.HeaderElement;
 import org.apache.http.HttpClientConnection;
@@ -108,7 +90,36 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xbill.DNS.Cache;
 import org.xbill.DNS.DClass;
-import net.lightbody.bmp.proxy.jetty.util.MultiMap;
+
+import javax.xml.bind.DatatypeConverter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 /**
  * WARN : Require zlib > 1.1.4 (deflate support)
@@ -118,8 +129,6 @@ public class BrowserMobHttpClient {
     private static final String VERSION = "2.1";
 
 	private static final Logger LOG = LoggerFactory.getLogger(BrowserMobHttpClient.class);
-	
-	private static volatile UserAgentStringParser parser;
 	
     private static final int BUFFER = 4096;
 
@@ -135,7 +144,7 @@ public class BrowserMobHttpClient {
      * keep contents
      */
     private volatile boolean captureContent;
-    
+
     /**
      * keep binary contents (if captureContent is set to true, default policy is to capture binary contents too)
      */
@@ -181,7 +190,7 @@ public class BrowserMobHttpClient {
     /**
      * List of URLs to rewrite
      */
-    private final List<RewriteRule> rewriteRules = new CopyOnWriteArrayList<RewriteRule>();
+    private final CopyOnWriteArrayList<RewriteRule> rewriteRules = new CopyOnWriteArrayList<RewriteRule>();
     
     /**
      * triggers to process when sending request
@@ -282,11 +291,11 @@ public class BrowserMobHttpClient {
                 return new ConnectionRequest() {
                     @Override
                     public HttpClientConnection get(long timeout, TimeUnit tunit) throws InterruptedException, ExecutionException, ConnectionPoolTimeoutException {
-                        Date start = new Date();
+                        long start = System.nanoTime();
                         try {
                             return wrapped.get(timeout, tunit);
                         } finally {
-                            RequestInfo.get().blocked(start, new Date());
+                            RequestInfo.get().blocked(start, System.nanoTime());
                         }
                     }
 
@@ -315,22 +324,19 @@ public class BrowserMobHttpClient {
         	.setRequestExecutor(new HttpRequestExecutor() {
         		@Override
                 protected HttpResponse doSendRequest(HttpRequest request, HttpClientConnection conn, HttpContext context) throws IOException, HttpException {
-
-
-                    // set date before sending
-                    Date start = new Date();
+                    long start = System.nanoTime();
                     
                     // send request
                     HttpResponse response = super.doSendRequest(request, conn, context);
                     
                     // set "sending" for resource
-                    RequestInfo.get().send(start, new Date());
+                    RequestInfo.get().send(start, System.nanoTime());
                     return response;
                 }
 
                 @Override
                 protected HttpResponse doReceiveResponse(HttpRequest request, HttpClientConnection conn, HttpContext context) throws HttpException, IOException {
-                    Date start = new Date();    
+                    long start = System.nanoTime();
                     HttpResponse response = super.doReceiveResponse(request, conn, context);
                     
                     // +4 => header/data separation
@@ -344,20 +350,20 @@ public class BrowserMobHttpClient {
                     if (entry != null) {
 						entry.getResponse().setHeadersSize(responseHeadersSize);
 					}
-                    if(streamManager.getLatency() > 0 && RequestInfo.get().getLatency() != null){
+                    if (streamManager.getLatency() > 0) {
                         // retrieve real latency discovered in connect SimulatedSocket
-                    	long realLatency = RequestInfo.get().getLatency();
+                        long realLatency = RequestInfo.get().getLatency(TimeUnit.MILLISECONDS);
                         // add latency
-                    	if(realLatency < streamManager.getLatency()){
+                        if (realLatency < streamManager.getLatency()) {
                             try {
-								Thread.sleep(streamManager.getLatency()-realLatency);
-							} catch (InterruptedException e) {
-								Thread.currentThread().interrupt();
-							}
-                        }  
-                    }  
+                                Thread.sleep(streamManager.getLatency() - realLatency);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }
+                    }
                     // set waiting time
-                    RequestInfo.get().wait(start,new Date());
+                    RequestInfo.get().wait(start, System.nanoTime());
                     
                     return response;
                 }
@@ -630,7 +636,7 @@ public class BrowserMobHttpClient {
                 String userAgent = uaHeaders[0].getValue();
                 try {
                     // note: this doesn't work for 'Fandango/4.5.1 CFNetwork/548.1.4 Darwin/11.0.0'
-                    ReadableUserAgent uai = getUserAgentStringParser().parse(userAgent);
+                    ReadableUserAgent uai = BrowserMobProxyUtil.getUserAgentStringParser().parse(userAgent);
                     String browser = uai.getName();
                     String version = uai.getVersionNumber().toVersionString();
                     har.getLog().setBrowser(new HarNameVersion(browser, version));
@@ -644,8 +650,8 @@ public class BrowserMobHttpClient {
         boolean rewrote = false;
         String newUrl = url;
         for (RewriteRule rule : rewriteRules) {
-            Matcher matcher = rule.match.matcher(newUrl);
-            newUrl = matcher.replaceAll(rule.replace);
+            Matcher matcher = rule.getMatch().matcher(newUrl);
+            newUrl = matcher.replaceAll(rule.getReplace());
             rewrote = true;
         }
 
@@ -713,6 +719,7 @@ public class BrowserMobHttpClient {
 
         // clear out any connection-related information so that it's not stale from previous use of this thread.
         RequestInfo.clear(url, entry);
+        RequestInfo.get().start();
 
         entry.setRequest(new HarRequest(method.getMethod(), url, method.getProtocolVersion().toString()));
         entry.setResponse(new HarResponse(-999, "NO RESPONSE", method.getProtocolVersion().toString()));
@@ -877,7 +884,7 @@ public class BrowserMobHttpClient {
         RequestInfo.get().finish();
 
         // set the start time and other timings
-        entry.setStartedDateTime(RequestInfo.get().getStart());
+        entry.setStartedDateTime(RequestInfo.get().getStartDate());
         entry.setTimings(RequestInfo.get().getTimings());
         entry.setServerIPAddress(RequestInfo.get().getResolvedAddress());
 
@@ -1003,7 +1010,7 @@ public class BrowserMobHttpClient {
                             	temp = new InflaterInputStream(new ByteArrayInputStream(copy.toByteArray()), new Inflater(true));
                             }
                             copy = new ByteArrayOutputStream();
-                            IOUtils.copy(temp, copy);
+                            IOUtils.copyAndClose(temp, copy);
                         } catch (IOException e) {
                             throw new RuntimeException("Error when decompressing input stream", e);
                         }
@@ -1105,7 +1112,7 @@ public class BrowserMobHttpClient {
 	}
 
 	private void setBinaryContentOfEntry(HarEntry entry, ByteArrayOutputStream copy) {
-		entry.getResponse().getContent().setText(Base64.byteArrayToBase64(copy.toByteArray()));
+        entry.getResponse().getContent().setText(DatatypeConverter.printBase64Binary(copy.toByteArray()));
 		entry.getResponse().getContent().setEncoding("base64");
 	}
 
@@ -1127,7 +1134,6 @@ public class BrowserMobHttpClient {
         blacklistEntries.clear();
         credsProvider.clear();
         httpClientConnMgr.shutdown();
-        HttpClientInterrupter.release(this);
     }
 
     public void abortActiveRequests() {
@@ -1144,7 +1150,7 @@ public class BrowserMobHttpClient {
         this.har = har;
         
         // eagerly initialize the User Agent String Parser, since it will be needed for the HAR
-        getUserAgentStringParser();
+        BrowserMobProxyUtil.getUserAgentStringParser();
     }
 
     public void setHarPageRef(String harPageRef) {
@@ -1192,6 +1198,19 @@ public class BrowserMobHttpClient {
 
     public void rewriteUrl(String match, String replace) {
         rewriteRules.add(new RewriteRule(match, replace));
+    }
+
+    public List<RewriteRule> getRewriteRules() {
+        return rewriteRules;
+    }
+
+    public void removeRewriteRule(String urlPattern) {
+        for (RewriteRule rewriteRule : rewriteRules) {
+            if (rewriteRule.getMatch().pattern().equals(urlPattern)) {
+                // rewriteRules is a CopyOnWriteArrayList, so we can modify it while iterating over it
+                rewriteRules.remove(rewriteRule);
+            }
+        }
     }
 
     public void clearRewriteRules() {
@@ -1284,6 +1303,15 @@ public class BrowserMobHttpClient {
     
     public void addHeader(String name, String value) {
         additionalHeaders.put(name, value);
+    }
+
+    public void setAdditionalHeaders(Map<String, String> additionalHeaders) {
+        additionalHeaders.clear();
+        additionalHeaders.putAll(additionalHeaders);
+    }
+
+    public Map<String, String> getAdditionalHeaders() {
+        return ImmutableMap.<String, String>builder().putAll(additionalHeaders).build();
     }
 
     /**
@@ -1428,18 +1456,12 @@ public class BrowserMobHttpClient {
         }
     }
 
-    private class RewriteRule {
-        private final Pattern match;
-        private final String replace;
-
-        private RewriteRule(String match, String replace) {
-            this.match = Pattern.compile(match);
-            this.replace = replace;
-        }
-    }
-
     private enum AuthType {
         NONE, BASIC, NTLM
+    }
+
+    public boolean isShutdown() {
+        return shutdown;
     }
 
     public void clearDNSCache() {
@@ -1490,24 +1512,17 @@ public class BrowserMobHttpClient {
 
         return bytesCopied;
     }
-    
-    private static final Object PARSER_INIT_LOCK = new Object();
-    
-    /**
-     * Retrieve the User Agent String Parser. Create the parser if it has not yet been initialized.
-     * @return
-     */
-    public static UserAgentStringParser getUserAgentStringParser() {
-		if (parser == null) {
-			synchronized (PARSER_INIT_LOCK) {
-				if (parser == null) {
-                    // using resourceModuleParser for now because user-agent-string.info no longer exists. the updating
-                    // parser will get incorrect data and wipe out its entire user agent repository.
-					parser = UADetectorServiceFactory.getResourceModuleParser();
-				}
-			}
-		}
-		
-		return parser;
-	}
+
+    public boolean isCaptureBinaryContent() {
+        return captureBinaryContent;
+    }
+
+    public boolean isCaptureContent() {
+        return captureContent;
+    }
+
+    public boolean isCaptureHeaders() {
+        return captureHeaders;
+    }
+
 }

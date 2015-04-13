@@ -14,8 +14,11 @@ import net.lightbody.bmp.proxy.jetty.util.IO;
 import net.lightbody.bmp.proxy.jetty.util.InetAddrPort;
 import net.lightbody.bmp.proxy.jetty.util.StringMap;
 import net.lightbody.bmp.proxy.jetty.util.URI;
-import net.lightbody.bmp.proxy.util.ResourceExtractor;
 import net.lightbody.bmp.proxy.util.TrustEverythingSSLTrustManager;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLHandshakeException;
@@ -34,13 +37,16 @@ import java.net.Socket;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /* ------------------------------------------------------------ */
 
@@ -55,7 +61,7 @@ import java.util.logging.Logger;
  * @version $Id: ProxyHandler.java,v 1.34 2005/10/05 13:32:59 gregwilkins Exp $
  */
 public class SeleniumProxyHandler extends AbstractHttpHandler {
-    private static Logger log = Logger.getLogger(SeleniumProxyHandler.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(SeleniumProxyHandler.class);
 
     protected Set<String> _proxyHostsWhiteList;
       protected Set<String> _proxyHostsBlackList;
@@ -258,7 +264,7 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
             response.getOutputStream().close();
           }
           catch (Exception e) {
-              log.log(Level.FINE, "Could not proxy " + uri, e);
+              log.warn("Could not proxy " + uri, e);
               if (!response.isCommitted())
                   response.sendError(HttpResponse.__400_Bad_Request, "Could not proxy " + uri + "\n" + e);
           }
@@ -287,7 +293,7 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
       }
 
       protected long proxyPlainTextRequest(URL url, String pathInContext, String pathParams, HttpRequest request, HttpResponse response) throws IOException {
-          log.fine("PROXY URL=" + url);
+          log.debug("PROXY URL=" + url);
 
           URLConnection connection = url.openConnection();
           if(System.getProperty("http.proxyHost") != null &&
@@ -406,7 +412,7 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
               response.setReason(http.getResponseMessage());
 
               String contentType = http.getContentType();
-              log.fine("Content-Type is: " + contentType);
+              log.debug("Content-Type is: " + contentType);
           }
 
           if (proxy_in == null) {
@@ -445,7 +451,7 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
           long bytesCopied = -1;
           request.setHandled(true);
           if (proxy_in != null) {
-              bytesCopied = ModifiedIO.copy(proxy_in, response.getOutputStream());
+              bytesCopied = IOUtils.copyLarge(proxy_in, response.getOutputStream());
           }
 
           return bytesCopied;
@@ -470,7 +476,7 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
           URI uri = request.getURI();
 
           try {
-              log.fine("CONNECT: " + uri);
+              log.debug("CONNECT: " + uri);
               InetAddrPort addrPort;
               // When logging, we'll attempt to send messages to hosts that don't exist
               if (uri.toString().endsWith(".selenium.doesnotexist:443")) {
@@ -523,7 +529,7 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
               }
           }
           catch (Exception e) {
-              log.log(Level.FINE, "error during handleConnect", e);
+              log.error("error during handleConnect", e);
               response.sendError(HttpResponse.__500_Internal_Server_Error, e.toString());
           }
       }
@@ -600,12 +606,22 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
               // see https://github.com/webmetrics/browsermob-proxy/issues/105
               String escapedHost = host.replace('*', '_');
 
-              File root = File.createTempFile("seleniumSslSupport", escapedHost);
-              root.delete();
-              root.mkdirs();
+              Path tempDir = Files.createTempDirectory("seleniumSslSupport" + escapedHost);
+              final File root = tempDir.toFile();
 
-              ResourceExtractor.extractResourcePath(getClass(), "/sslSupport", root);
+              // delete the temp directory when the VM stops or aborts
+              Runtime.getRuntime().addShutdownHook(new Thread(new DeleteDirectoryTask(tempDir)));
 
+              // copy the cybervillains cert files to the temp directory from the classpath
+              Path cybervillainsCer = tempDir.resolve("cybervillainsCA.cer");
+              Path cybervillainsJks = tempDir.resolve("cybervillainsCA.jks");
+              Path blankDec = tempDir.resolve("blank_crl.dec");
+              Path blankPem = tempDir.resolve("blank_crl.pem");
+
+              Files.copy(getClass().getResourceAsStream("/sslSupport/cybervillainsCA.cer"), cybervillainsCer);
+              Files.copy(getClass().getResourceAsStream("/sslSupport/cybervillainsCA.jks"), cybervillainsJks);
+              Files.copy(getClass().getResourceAsStream("/sslSupport/blank_crl.dec"), blankDec);
+              Files.copy(getClass().getResourceAsStream("/sslSupport/blank_crl.pem"), blankPem);
 
               KeyStoreManager mgr = new KeyStoreManager(root);
               mgr.getCertificateByHostname(host);
@@ -615,6 +631,7 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
               listener.setKeystore(new File(root, "cybervillainsCA.jks").getAbsolutePath());
               listener.setNukeDirOrFile(root);
           } catch (Exception e) {
+              log.error("Error occurred wiring CA", e);
               throw new RuntimeException(e);
           }
       }
@@ -628,7 +645,7 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
               return new HttpTunnel(socket, null, null);
           }
           catch (IOException e) {
-              log.log(Level.FINE, "Exception thrown", e);
+              log.warn("Exception creating new HTTP tunnel", e);
               response.sendError(HttpResponse.__400_Bad_Request);
               return null;
           }
@@ -792,13 +809,49 @@ public class SeleniumProxyHandler extends AbstractHttpHandler {
           public void stop() throws InterruptedException {
               super.stop();
 
-              if (nukeDirOrFile != null) {
-                  if (nukeDirOrFile.isDirectory()) {
-                      LauncherUtils.recursivelyDeleteDir(nukeDirOrFile);
-                  } else {
-                      nukeDirOrFile.delete();
-                  }
-              }
+              FileUtils.deleteQuietly(nukeDirOrFile);
           }
       }
+
+    /**
+     * A Runnable that deletes the specified directory. Useful as a shutdown hook.
+     */
+    private static class DeleteDirectoryTask implements Runnable {
+        private final Path directory;
+
+        public DeleteDirectoryTask(Path directory) {
+            this.directory = directory;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                        try {
+                            Files.delete(file);
+                        } catch (IOException e) {
+                            log.warn("Unable to delete file or directory", e);
+                        }
+
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                        try {
+                            Files.delete(dir);
+                        } catch (IOException e) {
+                            log.warn("Unable to delete file or directory", e);
+                        }
+                        
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            } catch (IOException e) {
+                log.warn("Unable to delete file or directory", e);
+            }
+        }
+    }
 }

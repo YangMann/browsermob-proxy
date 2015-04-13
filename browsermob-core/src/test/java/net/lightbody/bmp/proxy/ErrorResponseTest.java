@@ -19,7 +19,7 @@ public class ErrorResponseTest extends ProxyServerTest {
         try (CloseableHttpResponse response = getResponseFromHost(url)) {
             assertEquals("Expected 502 error due to unknown host", 502, response.getStatusLine().getStatusCode());
 
-            String responseBody = IOUtils.readFully(response.getEntity().getContent());
+            String responseBody = IOUtils.toStringAndClose(response.getEntity().getContent());
 
             String hostNotFoundTitle = MessagesUtil.getMessage("response.dns_not_found.title");
 
@@ -30,12 +30,12 @@ public class ErrorResponseTest extends ProxyServerTest {
 
     @Test
     public void testConnectionRefused() throws IOException {
-        String url = "http://0.0.0.0";
+        String url = "http://127.0.3.4:62663";
 
         try (CloseableHttpResponse response = getResponseFromHost(url)) {
             assertEquals("Expected 502 error due to connection failure", 502, response.getStatusLine().getStatusCode());
 
-            String responseBody = IOUtils.readFully(response.getEntity().getContent());
+            String responseBody = IOUtils.toStringAndClose(response.getEntity().getContent());
 
             String connectionFailureTitle = MessagesUtil.getMessage("response.conn_failure.title");
 
@@ -45,15 +45,15 @@ public class ErrorResponseTest extends ProxyServerTest {
     }
 
     @Test
-    public void testHostUnreachable() throws IOException {
+    public void testConnectionTimeout() throws IOException {
         proxy.setConnectionTimeout(1);
 
-        String url = "http://1.2.3.4";
+        String url = "http://1.2.3.4:62663";
 
         try (CloseableHttpResponse response = getResponseFromHost(url)) {
-            assertEquals("Expected 502 error due to connection timeout", 502, response.getStatusLine().getStatusCode());
+            assertEquals("Expected 504 error due to connection timeout", 504, response.getStatusLine().getStatusCode());
 
-            String responseBody = IOUtils.readFully(response.getEntity().getContent());
+            String responseBody = IOUtils.toStringAndClose(response.getEntity().getContent());
 
             String networkTimeoutTitle = MessagesUtil.getMessage("response.net_timeout.title");
 
